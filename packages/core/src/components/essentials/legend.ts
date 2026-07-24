@@ -29,9 +29,13 @@ export class Legend extends Component {
 
 		let dataGroups = this.model.getDataGroups()
 
-		// Check if there are disabled legend items
+		// Check if there are disabled legend items, or if the user is in an explicit
+		// selection state (selectedGroups non-empty) — needed so that when all items
+		// are re-enabled after selecting the last one, the checkmarks stay visible.
 		const { DISABLED } = legendConfigs.items.status
-		const hasDeactivatedItems = dataGroups.some((dataGroup: any) => dataGroup.status === DISABLED)
+		const hasDeactivatedItems =
+			dataGroups.some((dataGroup: any) => dataGroup.status === DISABLED) ||
+			getProperty(options, 'data', 'selectedGroups')?.length > 0
 		const userProvidedOrder = getProperty(legendOptions, 'order')
 
 		const svg = this.getComponentContainer()

@@ -77,17 +77,17 @@ export class ChartModel {
 			...(typeof tableCellFormatter === 'function'
 				? tableCellFormatter(cells)
 				: cells.map((data: (string | number)[]) => {
-						if (domainValueFormatter) {
-							data[1] = domainValueFormatter(data[1]) as string
+					if (domainValueFormatter) {
+						data[1] = domainValueFormatter(data[1]) as string
+					}
+					for (const i in data) {
+						const val = data[i]
+						if (typeof val === 'number') {
+							data[i] = numberFormatter(val, localeCode)
 						}
-						for (const i in data) {
-							const val = data[i]
-							if (typeof val === 'number') {
-								data[i] = numberFormatter(val, localeCode)
-							}
-						}
-						return data
-					}))
+					}
+					return data
+				}))
 		]
 		return result
 	}
@@ -550,13 +550,16 @@ export class ChartModel {
 
 		const hasDeactivatedItems = dataGroups.some((group: any) => group.status === DISABLED)
 		const activeItems = dataGroups.filter((group: any) => group.status === ACTIVE)
+		const options = this.getOptions()
 
-		// If there are deactivated items, toggle "changedLabel"
-		if (hasDeactivatedItems) {
-			// If the only active item is being toggled
-			// Activate all items
+		// Treat "all explicitly selected" (selectedGroups non-empty, no DISABLED items) the same
+		// as having deactivated items — the user is in a filtered state, not the default all-active state.
+		const isInFilteredState = hasDeactivatedItems || options.data.selectedGroups.length > 0
+
+		// If in a filtered state, toggle "changedLabel"
+		if (isInFilteredState) {
+			// If the only active item is being toggled, activate all items (reset)
 			if (activeItems.length === 1 && activeItems[0].name === changedLabel) {
-				// If every item is active, then enable "changedLabel" and disable all other items
 				dataGroups.forEach((_: any, i: number) => {
 					dataGroups[i].status = ACTIVE
 				})
@@ -566,7 +569,7 @@ export class ChartModel {
 					dataGroups[indexToChange].status === DISABLED ? ACTIVE : DISABLED
 			}
 		} else {
-			// If every item is active, then enable "changedLabel" and disable all other items
+			// No filter in effect — first click isolates the clicked item, disabling all others
 			dataGroups.forEach((group: any, i: number) => {
 				dataGroups[i].status = group.name === changedLabel ? ACTIVE : DISABLED
 			})
@@ -574,15 +577,17 @@ export class ChartModel {
 
 		// Updates selected groups
 		const updatedActiveItems = dataGroups.filter((group: any) => group.status === ACTIVE)
-		const options = this.getOptions()
 
 		const hasUpdatedDeactivatedItems = dataGroups.some((group: any) => group.status === DISABLED)
 
-		// If there are deactivated items, map the item name into selected groups
-		if (hasUpdatedDeactivatedItems) {
+		// Detect the "reset all" case: the only active item was re-clicked → all items restored.
+		const wasReset = isInFilteredState && activeItems.length === 1 && activeItems[0].name === changedLabel
+
+		if (hasUpdatedDeactivatedItems || (isInFilteredState && !wasReset)) {
+			// Still in a filtered state — keep selectedGroups up to date
 			options.data.selectedGroups = updatedActiveItems.map((activeItem: any) => activeItem.name)
 		} else {
-			// If every item is active, clear array
+			// No filter in effect (was never filtered, or user just reset) — clear selectedGroups
 			options.data.selectedGroups = []
 		}
 
@@ -658,9 +663,9 @@ export class ChartModel {
 		let className = configs.originalClassName
 		configs.classNameTypes.forEach(
 			type =>
-				(className = configs.originalClassName
-					? `${className} ${type}-${colorPairingTag}`
-					: `${type}-${colorPairingTag}`)
+			(className = configs.originalClassName
+				? `${className} ${type}-${colorPairingTag}`
+				: `${type}-${colorPairingTag}`)
 		)
 
 		return className || ''
